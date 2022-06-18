@@ -1,6 +1,8 @@
+from http.client import InvalidURL
 import pygame
 from pygame import gfxdraw
 import random
+from itertools import combinations, permutations, chain
 
 # Initialize Pygame
 pygame.init()
@@ -21,7 +23,7 @@ BOARD_LEFT_X = 200
 BOARD_TOP_Y = 100
 
 # Game Variables
-FPS = 60
+FPS = 120
 TILE_SIZE = 60
 
 # Dice
@@ -107,6 +109,45 @@ mouse_clicked = False
 
 def rotate_2d_array_clockwise(arr):
     return list(zip(*reversed(arr)))
+
+
+def splits_r(str, current, res, max_splits):
+
+    if len(str) == 0:
+        if len(current) <= max_splits:
+            res += [current]
+    else:
+        for i in range(len(str)):
+            splits_r(str[i + 1 :], current + [str[0 : i + 1]], res, max_splits)
+
+
+def splits(str, max_splits):
+
+    res = []
+
+    splits_r(str, [], res, max_splits)
+
+    return res
+
+
+def powerset(iterable):
+    "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+    s = list(iterable)
+    return list(
+        set(
+            "".join(sorted(x))
+            for x in chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
+            if x
+        )
+    )
+
+
+def permutate_string(string):
+    # print(list(set("".join(x) for x in permutations(string))))
+    return list(set("".join(x) for x in permutations(string)))
+    # return [
+    #     f"{'6'*i}{string[-1]}{'6'*(len(string) - i-1)}" for i, _ in enumerate(string)
+    # ]
 
 
 class Board:
@@ -253,7 +294,7 @@ class Board:
             self.roll_index = 0
             self.rolls = []
 
-            if self.turn > 3:
+            if self.turn >= len(self.players):
                 self.turn = 0
 
     def check_for_six(self):
@@ -303,6 +344,9 @@ class Board:
             if not pygame.mouse.get_pressed()[0]:
                 self.pressed = False
 
+    def next_turn(self):
+        self.turn_over = True
+
     def update(self):
         if (
             diceRect.collidepoint(pygame.mouse.get_pos())
@@ -316,10 +360,13 @@ class Board:
                 self.rolls.append(roll)
 
                 self.rolling = True
+
                 self.rolled = True
 
         if not pygame.mouse.get_pressed()[0]:
             self.rolling = False
+
+        self.check_for_six()
 
         update_again = False
 
@@ -332,6 +379,7 @@ class Board:
                 self.rolled,
                 self.tiles_with_multiple_pieces,
                 self.captured_pieces_info,
+                self.next_turn,
             )
 
             update_again = True if update_again_ else update_again
@@ -344,7 +392,6 @@ class Board:
         if self.rolled and not is_piece_moving and len(self.rolls) == 0:
             self.turn_over = True
 
-        self.check_for_six()
         self.update_turn()
         return update_again
 
@@ -364,7 +411,7 @@ class Piece:
         self.selected = False
         self.speed = 20
         self.speed_counter = self.speed
-        self.piece_sizes = ((0.5, 0.5), (0.4, 0.35), (0.2, 0.18))
+        self.piece_sizes = ((0.55, 0.5), (0.4, 0.35), (0.2, 0.18))
         self.piece_coords_offset = (
             (0.5, 0.5),
             (0.5, 0.5),
@@ -372,6 +419,7 @@ class Piece:
         )
         self.piece_draw_index = 0
         self.captured = False
+        self.can_move = False
 
     def draw(self, surface):
         self.draw_piece(surface)
@@ -387,14 +435,14 @@ class Piece:
             int(self.position.x + TILE_SIZE * x_offset),
             int(self.position.y + TILE_SIZE * y_offset),
             int(self.position.height * size1),
-            WHITE,
+            DARK_GREY if self.can_move else WHITE,
         )
         gfxdraw.filled_circle(
             surface,
             int(self.position.x + TILE_SIZE * x_offset),
             int(self.position.y + TILE_SIZE * y_offset),
             int(self.position.height * size1),
-            WHITE,
+            DARK_GREY if self.can_move else WHITE,
         )
 
         gfxdraw.aacircle(
@@ -432,6 +480,7 @@ class Piece:
             elif rolls[roll_index] == 6:
                 rolls.pop(roll_index)
                 self.playing = True
+                return True
 
     def check_legal_moves(self, is_turn, rolls, rolled):
 
@@ -442,6 +491,7 @@ class Piece:
 
         if (
             self.position.collidepoint(pygame.mouse.get_pos())
+            and self.can_move
             and is_turn
             and not self.selected
             and not is_piece_moving
@@ -474,6 +524,10 @@ class Piece:
             if i[1] != self.player_index and i[0] == self.position.center:
                 self.captured = True
 
+    def check_promoted(self):
+        if self.path_index == 56:
+            self.promoted = True
+
     def update(
         self,
         can_promote,
@@ -483,52 +537,63 @@ class Piece:
         rolled,
         tiles_with_multiple_pieces,
         captured_pieces_info,
+        can_piece_move,
     ):
-        global is_piece_moving
+        update_again_ = False
 
-        self.check_captured_pieces_info(captured_pieces_info)
+        if not self.promoted:
+            global is_piece_moving
 
-        if self.captured:
-            self.reset()
+            self.check_promoted()
 
-        if self.selected:
-            self.speed_counter += 1
+            self.can_move = can_piece_move
 
-        self.moved()
+            self.check_captured_pieces_info(captured_pieces_info)
 
-        self.click(is_turn)
-        self.move(rolls, roll_index, is_turn, rolled)
+            if self.captured:
+                self.reset()
 
-        self.piece_draw_index = (
-            2
-            if self.position.center in tiles_with_multiple_pieces
-            else 1
-            if self.playing
-            else 0
-        )
+            if self.selected:
+                self.speed_counter += 1
 
-        if self.move_amount > 0:
-            is_piece_moving = True
+            self.moved()
 
-        if self.move_amount > 0 and self.speed_counter > self.speed:
-            self.path_index += 1
-            self.move_amount -= 1
-            self.speed_counter = 0
+            self.click(is_turn)
+            update_again_ = self.move(rolls, roll_index, is_turn, rolled)
 
-        if not can_promote and self.path_index > 50:
-            self.path_index = -1
+            self.piece_draw_index = (
+                2
+                if self.position.center in tiles_with_multiple_pieces
+                else 1
+                if self.playing
+                else 0
+            )
 
-        if self.path_index > 56:
-            self.path_index = 56
+            if self.move_amount > 0:
+                is_piece_moving = True
 
-        self.position = (
-            self.piece_path[self.path_index] if self.playing else self.initial_position
-        )
+            if self.move_amount > 0 and self.speed_counter > self.speed:
+                self.path_index += 1
+                self.move_amount -= 1
+                self.speed_counter = 0
 
+            # if not can_promote and self.path_index > 50:
+            #     self.path_index = -1
+
+            # if self.path_index > 56:
+            #     self.path_index = 56
+
+            self.position = (
+                self.piece_path[self.path_index]
+                if self.playing
+                else self.initial_position
+            )
+
+        # print(can_piece_move)
         return (
-            self.check_legal_moves(is_turn, rolls, rolled),
+            # self.check_legal_moves(is_turn, rolls, rolled) or can_piece_move,
             self.get_piece_pos_details()[0],
-            self.speed_counter == 0,
+            self.speed_counter == 0 or update_again_,
         )
 
 
@@ -540,8 +605,14 @@ class Player:
         self.max_pieces = max_pieces
         self.rect = self.get_player_area_rect()
         self.pieces = self.make_pieces()
+        self.pieces_pos = []
         self.can_promote = True
         self.is_turn = False
+        self.total_move_combos = []
+        self.total_possible_moves = []
+        self.possible_move_combos = []
+        self.can_pieces_move = [False for _ in range(self.max_pieces)]
+        self.won = False
 
     def draw_player_area(self, surface):
         pygame.draw.rect(surface, WHITE, self.rect, 0, 15)
@@ -627,6 +698,76 @@ class Player:
                     )
         return pieces_path_coords
 
+    def update_move_combos(self, rolled, rolls):
+        if rolled and self.is_turn:
+            rolls_str = "".join(str(x) for x in rolls)
+
+            a = permutate_string(rolls_str)
+
+            q = [
+                list(x) + [0 for _ in range(self.max_pieces - len(x))]
+                for x in set(
+                    tuple(x)
+                    for x in [
+                        sorted(w, key=int)
+                        for x in a
+                        for w in splits(x, self.max_pieces)
+                    ]
+                )
+            ]
+
+            self.total_move_combos = list(
+                set(z for x in list(list(set(permutations(x))) for x in q) for z in x)
+            )
+
+            self.total_possible_moves = powerset(rolls_str)
+
+            print(self.total_possible_moves)
+
+            invalid_moves = [[] for _ in range(self.max_pieces)]
+            is_piece_playing = [False for _ in range(self.max_pieces)]
+
+            for piece in self.pieces:
+                is_piece_playing[piece.index] = piece.playing
+
+                move_limit = 56 - piece.path_index + (6 if not piece.playing else 0)
+
+                for moves in self.total_possible_moves:
+                    moves_sum = sum([int(x) for x in moves])
+                    if moves_sum > move_limit:
+                        invalid_moves[piece.index].append(moves)
+
+            self.possible_move_combos = [
+                x
+                for x in self.total_move_combos
+                if all(
+                    [
+                        x[i] == 0
+                        or "".join(sorted(list(x[i]), key=int)) not in v
+                        and (is_piece_playing[i] or x[i][0] == "6")
+                        for i, v in enumerate(invalid_moves)
+                    ]
+                )
+            ]
+            print(self.total_possible_moves)
+            print(self.possible_move_combos)
+
+    def update_can_pieces_move(self, rolled, rolls, roll_index):
+        if rolled and self.is_turn and not is_piece_moving:
+            # print(self.total_move_combos)
+            # print(self.possible_move_combos)
+
+            roll = rolls[roll_index]
+            for piece in self.pieces:
+                self.can_pieces_move[piece.index] = any(
+                    int(x[piece.index][0]) == roll
+                    for x in self.possible_move_combos
+                    if x[piece.index]
+                )
+
+        else:
+            self.can_pieces_move = [False, False, False, False]
+
     def get_player_area_rect(self):
         x1, y1 = PLAYERS_AREA_TILES_OFFSET[self.index]
 
@@ -637,6 +778,10 @@ class Player:
             TILE_SIZE * 3.5,
         )
 
+    def check_win(self):
+        if all(piece.promoted for piece in self.pieces):
+            self.won = True
+
     def update(
         self,
         turn,
@@ -645,43 +790,67 @@ class Player:
         rolled,
         tiles_with_multiple_pieces,
         captured_pieces_info,
+        next_turn,
     ):
         self.is_turn = self.index == turn
 
-        if len(captured_pieces_info) and captured_pieces_info[0][1] == self.index:
-            self.can_promote = True
+        if not self.won:
+            self.check_win()
 
-        can_pieces_move = []
-        pieces_pos = []
+            if len(captured_pieces_info) and captured_pieces_info[0][1] == self.index:
+                self.can_promote = True
 
-        update_again = False
+            # can_pieces_move = []
+            pieces_pos = []
 
-        for piece in self.pieces:
-            can_piece_move, piece_pos, update_again_ = piece.update(
-                self.can_promote,
-                self.is_turn,
-                rolls,
-                roll_index,
-                rolled,
-                tiles_with_multiple_pieces,
-                captured_pieces_info,
-            )
+            update_again = False
 
-            update_again = True if update_again_ else update_again
+            self.update_move_combos(rolled, rolls)
+            self.update_can_pieces_move(rolled, rolls, roll_index)
 
-            can_pieces_move.append(can_piece_move)
-            pieces_pos.append(piece_pos)
+            if (
+                self.is_turn
+                and not is_piece_moving
+                and all(not x for x in self.can_pieces_move)
+                and rolled
+            ):
+                rolls.clear()
 
-        if all(not x for x in can_pieces_move):
-            rolls.clear()
+            for piece in self.pieces:
+                piece_pos, update_again_ = piece.update(
+                    self.can_promote,
+                    self.is_turn,
+                    rolls,
+                    roll_index,
+                    rolled,
+                    tiles_with_multiple_pieces,
+                    captured_pieces_info,
+                    self.can_pieces_move[piece.index],
+                )
 
-        return (pieces_pos, update_again)
+                update_again = True if update_again_ else update_again
+
+                # can_pieces_move.append(can_piece_move)
+                pieces_pos.append(piece_pos)
+
+            if self.won:
+                self.pieces_pos = pieces_pos
+
+            # if all(not x for x in can_pieces_move):
+            #     rolls.clear()
+
+            return (pieces_pos, update_again)
+        else:
+            if self.is_turn:
+                next_turn()
+
+            return (self.pieces_pos, False)
 
 
-player1 = Player(0, RED, DARK_RED, 4)
+player1 = Player(0, RED, DARK_RED, 2)
 player2 = Player(1, BLUE, DARK_BLUE, 4)
-player3 = Player(2, ORANGE, DARK_ORANGE, 4)
-player4 = Player(3, GREEN, DARK_GREEN, 4)
+player3 = Player(2, ORANGE, DARK_ORANGE, 3)
+player4 = Player(3, GREEN, DARK_GREEN, 1)
 
 players = (player1, player2, player3, player4)
 
