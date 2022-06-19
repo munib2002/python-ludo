@@ -23,7 +23,7 @@ BOARD_LEFT_X = 200
 BOARD_TOP_Y = 100
 
 # Game Variables
-FPS = 120
+FPS = 240
 TILE_SIZE = 60
 
 # Dice
@@ -115,7 +115,7 @@ def splits_r(str, current, res, max_splits):
 
     if len(str) == 0:
         if len(current) <= max_splits:
-            res += [current]
+            res += [sorted(current, key=int)]
     else:
         for i in range(len(str)):
             splits_r(str[i + 1 :], current + [str[0 : i + 1]], res, max_splits)
@@ -130,8 +130,7 @@ def splits(str, max_splits):
     return res
 
 
-def powerset(iterable):
-    "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+def unique_powerset_of_string(iterable):
     s = list(iterable)
     return list(
         set(
@@ -150,6 +149,46 @@ def permutate_string(string):
     # ]
 
 
+class Button:
+    def __init__(self, x, y, width, height, text):
+        self.rect = pygame.Rect((x, y, width, height))
+        self.rect_border = pygame.Rect((x, y, width + 2, height + 2))
+
+        self.text = text
+        self.pressed = False
+
+    def draw(self, surface, color=LIGHT_GREY):
+        pygame.draw.rect(surface, color, self.rect)
+        pygame.draw.rect(surface, DARK_GREY, self.rect_border, 1)
+
+        font = pygame.font.SysFont("Futura", self.rect.height)
+
+        text_img = font.render(f"{self.text}", True, DARK_GREY)
+
+        surface.blit(
+            text_img,
+            (
+                self.rect.centerx - text_img.get_width() / 2 + 1,
+                self.rect.centery - text_img.get_height() / 2 + 1,
+            ),
+        )
+
+    def update(self):
+        if (
+            self.rect.collidepoint(pygame.mouse.get_pos())
+            and not self.pressed
+            and not mouse_clicked
+        ):
+            if pygame.mouse.get_pressed()[0]:
+                self.pressed = True
+
+        if not pygame.mouse.get_pressed()[0]:
+            self.pressed = False
+
+    def get_pressed(self):
+        return self.pressed
+
+
 class Board:
     def __init__(self, x, y, board_base_layout, players):
         self.x = x
@@ -158,6 +197,7 @@ class Board:
         self.players = players
         self.turn = 1
         self.rolls = []
+        self.rolls_buttons = []
         self.roll_index = 0
         self.rolled = False
         self.turn_over = False
@@ -171,6 +211,8 @@ class Board:
             for key, val in players[0].pieces[0].piece_path.items()
             if key in SAFE_SQUARES
         ]
+
+        self.rolls_updated = False
 
         self.pressed = False  # Temp
 
@@ -315,6 +357,29 @@ class Board:
         surface.blit(rollImg, (350, 50))
         surface.blit(lastRollImg, (50, 150))
 
+    def update_rolls_buttons(self):
+        self.rolls_buttons = []
+        for i, val in enumerate(self.rolls):
+            button = Button(
+                SCREEN_WIDTH / 3 + i * TILE_SIZE * 0.8,
+                BOARD_TOP_Y / 2 - TILE_SIZE / 4,
+                TILE_SIZE / 2,
+                TILE_SIZE / 2,
+                val,
+            )
+
+            self.rolls_buttons.append(button)
+
+            button.update()
+
+            if button.get_pressed():
+                print(self.roll_index)
+                self.roll_index = i
+
+    def draw_rolls_buttons(self, surface):
+        for button in self.rolls_buttons:
+            button.draw(surface)
+
     def draw(self, surface):
         self.draw_base_board(surface)
         self.draw_board_grid(surface)
@@ -323,29 +388,67 @@ class Board:
         self.draw_players_pieces(surface)
         self.draw_temp(surface)
         self.draw_temp_dice_roll_adder(surface)
+        self.draw_rolls_buttons(surface)
 
     def draw_temp_dice_roll_adder(self, surface):
 
         for i in range(1, 7):
-            r = pygame.draw.rect(surface, LIGHT_GREY, (500 + i * 50, 10, 30, 30))
-            pygame.draw.rect(surface, DARK_GREY, (500 + i * 50, 10, 32, 32), 1)
+            button = Button(500 + i * 50, 10, 30, 30, i)
 
-            font = pygame.font.SysFont("Futura", 30)
+            # r = pygame.draw.rect(surface, LIGHT_GREY, (500 + i * 50, 10, 30, 30))
+            # pygame.draw.rect(surface, DARK_GREY, (500 + i * 50, 10, 32, 32), 1)
 
-            numImg = font.render(f"{i}", True, DARK_GREY)
+            # font = pygame.font.SysFont("Futura", 30)
 
-            surface.blit(numImg, (r.x + 10, r.y + 8))
+            # numImg = font.render(f"{i}", True, DARK_GREY)
 
-            if r.collidepoint(pygame.mouse.get_pos()) and not self.pressed:
-                if pygame.mouse.get_pressed()[0]:
-                    self.pressed = True
-                    self.rolls.append(i)
+            # surface.blit(numImg, (r.x + 10, r.y + 8))
 
-            if not pygame.mouse.get_pressed()[0]:
-                self.pressed = False
+            button.update()
+            button.draw(surface)
+
+            if button.get_pressed():
+                self.rolls.append(i)
+                self.rolls_updated = True
+
+            # if r.collidepoint(pygame.mouse.get_pos()) and not self.pressed:
+            #     if pygame.mouse.get_pressed()[0]:
+            #         self.pressed = True
+            #         self.rolls.append(i)
+
+            # if not pygame.mouse.get_pressed()[0]:
+            #     self.pressed = False
+        # for i in range(1, 7):
+        #     r = pygame.draw.rect(surface, LIGHT_GREY, (500 + i * 50, 10, 30, 30))
+        #     pygame.draw.rect(surface, DARK_GREY, (500 + i * 50, 10, 32, 32), 1)
+
+        #     font = pygame.font.SysFont("Futura", 30)
+
+        #     numImg = font.render(f"{i}", True, DARK_GREY)
+
+        #     surface.blit(numImg, (r.x + 10, r.y + 8))
+
+        #     if r.collidepoint(pygame.mouse.get_pos()) and not self.pressed:
+        #         if pygame.mouse.get_pressed()[0]:
+        #             self.pressed = True
+        #             self.rolls.append(i)
+
+        #     if not pygame.mouse.get_pressed()[0]:
+        #         self.pressed = False
+
+    def update_rolls(self):
+        roll = self.rolls.pop(self.roll_index)
+        self.roll_index = 0
+
+        self.rolls_updated = True
+
+        return roll
 
     def next_turn(self):
         self.turn_over = True
+
+    def reset_rolls_updated(self):
+        self.rolls_updated = False
 
     def update(self):
         if (
@@ -360,13 +463,16 @@ class Board:
                 self.rolls.append(roll)
 
                 self.rolling = True
-
-                self.rolled = True
+                self.rolls_updated = True
+                if roll != 6:
+                    self.rolled = True
 
         if not pygame.mouse.get_pressed()[0]:
             self.rolling = False
 
-        self.check_for_six()
+        # self.check_for_six()
+
+        self.update_rolls_buttons()
 
         update_again = False
 
@@ -380,6 +486,9 @@ class Board:
                 self.tiles_with_multiple_pieces,
                 self.captured_pieces_info,
                 self.next_turn,
+                self.update_rolls,
+                self.rolls_updated,
+                self.reset_rolls_updated,
             )
 
             update_again = True if update_again_ else update_again
@@ -389,8 +498,8 @@ class Board:
         self.update_tiles_with_multiple_pieces()
         self.update_captured_pieces_info()
 
-        if self.rolled and not is_piece_moving and len(self.rolls) == 0:
-            self.turn_over = True
+        # if self.rolled and not is_piece_moving and len(self.rolls) == 0:
+        #     self.turn_over = True
 
         self.update_turn()
         return update_again
@@ -473,18 +582,18 @@ class Piece:
             ),
         )
 
-    def move(self, rolls, roll_index, is_turn, rolled):
+    def move(self, rolls, roll_index, is_turn, rolled, update_rolls):
         if self.selected and is_turn and rolled and self.move_amount == 0:
             if self.playing:
-                self.move_amount = 0 if len(rolls) == 0 else rolls.pop(roll_index)
+                self.move_amount = 0 if len(rolls) == 0 else update_rolls()
             elif rolls[roll_index] == 6:
-                rolls.pop(roll_index)
+                update_rolls()
                 self.playing = True
                 return True
 
-    def check_legal_moves(self, is_turn, rolls, rolled):
+    # def check_legal_moves(self, is_turn, rolls, rolled):
 
-        return not is_turn or not rolled or self.playing or 6 in rolls
+    #     return not is_turn or not rolled or self.playing or 6 in rolls
 
     def click(self, is_turn):
         global is_piece_moving, mouse_clicked
@@ -538,6 +647,7 @@ class Piece:
         tiles_with_multiple_pieces,
         captured_pieces_info,
         can_piece_move,
+        update_rolls,
     ):
         update_again_ = False
 
@@ -559,7 +669,7 @@ class Piece:
             self.moved()
 
             self.click(is_turn)
-            update_again_ = self.move(rolls, roll_index, is_turn, rolled)
+            update_again_ = self.move(rolls, roll_index, is_turn, rolled, update_rolls)
 
             self.piece_draw_index = (
                 2
@@ -608,7 +718,7 @@ class Player:
         self.pieces_pos = []
         self.can_promote = True
         self.is_turn = False
-        self.total_move_combos = []
+        # self.total_move_combos = []
         self.total_possible_moves = []
         self.possible_move_combos = []
         self.can_pieces_move = [False for _ in range(self.max_pieces)]
@@ -698,29 +808,32 @@ class Player:
                     )
         return pieces_path_coords
 
-    def update_move_combos(self, rolled, rolls):
-        if rolled and self.is_turn:
+    def update_move_combos(self, rolled, rolls, rolls_updated, reset_rolls_updated):
+        if rolled and self.is_turn and not is_piece_moving and rolls_updated:
             rolls_str = "".join(str(x) for x in rolls)
 
-            a = permutate_string(rolls_str)
+            moves_permutation = permutate_string(rolls_str)
 
-            q = [
-                list(x) + [0 for _ in range(self.max_pieces - len(x))]
-                for x in set(
-                    tuple(x)
-                    for x in [
-                        sorted(w, key=int)
-                        for x in a
-                        for w in splits(x, self.max_pieces)
-                    ]
+            move_combos_for_1_order = [
+                list(move_combo) + [0 for _ in range(self.max_pieces - len(move_combo))]
+                for move_combo in set(
+                    tuple(move_combo)
+                    for move_order in moves_permutation
+                    for move_combo in splits(move_order, self.max_pieces)
                 )
             ]
 
-            self.total_move_combos = list(
-                set(z for x in list(list(set(permutations(x))) for x in q) for z in x)
-            )
+            # self.total_move_combos = list(
+            #     set(
+            #         z
+            #         for x in list(
+            #             list(set(permutations(x))) for x in move_combos_for_1_order
+            #         )
+            #         for z in x
+            #     )
+            # )
 
-            self.total_possible_moves = powerset(rolls_str)
+            self.total_possible_moves = unique_powerset_of_string(rolls_str)
 
             print(self.total_possible_moves)
 
@@ -737,23 +850,69 @@ class Player:
                     if moves_sum > move_limit:
                         invalid_moves[piece.index].append(moves)
 
-            self.possible_move_combos = [
-                x
-                for x in self.total_move_combos
-                if all(
-                    [
-                        x[i] == 0
-                        or "".join(sorted(list(x[i]), key=int)) not in v
-                        and (is_piece_playing[i] or x[i][0] == "6")
-                        for i, v in enumerate(invalid_moves)
-                    ]
+            # print(
+            #     list(
+            #         set(
+            #             z
+            #             for x in list(
+            #                 list(set(permutations(x))) for x in move_combos_for_1_order
+            #             )
+            #             for z in x
+            #             if all(
+            #                 [
+            #                     z[i] == 0
+            #                     or "".join(sorted(list(z[i]), key=int)) not in v
+            #                     and (is_piece_playing[i] or z[i][0] == "6")
+            #                     for i, v in enumerate(invalid_moves)
+            #                 ]
+            #             )
+            #         )
+            #     ),
+            #     "------------------------------",
+            # )
+
+            self.possible_move_combos = list(
+                set(
+                    z
+                    for x in list(
+                        list(set(permutations(x))) for x in move_combos_for_1_order
+                    )
+                    for z in x
+                    if all(
+                        [
+                            z[i] == 0
+                            or "".join(sorted(list(z[i]), key=int)) not in v
+                            and (is_piece_playing[i] or z[i][0] == "6")
+                            for i, v in enumerate(invalid_moves)
+                        ]
+                    )
+                    and any(a != 0 for a in z)
                 )
-            ]
-            print(self.total_possible_moves)
-            print(self.possible_move_combos)
+            )
+
+            # self.possible_move_combos = [
+            #     x
+            #     for x in self.total_move_combos
+            #     if all(
+            #         [
+            #             x[i] == 0
+            #             or "".join(sorted(list(x[i]), key=int)) not in v
+            #             and (is_piece_playing[i] or x[i][0] == "6")
+            #             for i, v in enumerate(invalid_moves)
+            #         ]
+            #     )
+            # ]
+
+            reset_rolls_updated()
+
+            print(self.possible_move_combos, "-----------")
+        # elif is_piece_moving and self.is_turn:
+        #     self.possible_move_combos = []
+        #     self.total_possible_moves = []
+        #     self.total_move_combos = []
 
     def update_can_pieces_move(self, rolled, rolls, roll_index):
-        if rolled and self.is_turn and not is_piece_moving:
+        if rolled and self.is_turn and not is_piece_moving and len(rolls):
             # print(self.total_move_combos)
             # print(self.possible_move_combos)
 
@@ -766,7 +925,7 @@ class Player:
                 )
 
         else:
-            self.can_pieces_move = [False, False, False, False]
+            self.can_pieces_move = [False for _ in range(self.max_pieces)]
 
     def get_player_area_rect(self):
         x1, y1 = PLAYERS_AREA_TILES_OFFSET[self.index]
@@ -791,6 +950,9 @@ class Player:
         tiles_with_multiple_pieces,
         captured_pieces_info,
         next_turn,
+        update_rolls,
+        rolls_updated,
+        reset_rolls_updated,
     ):
         self.is_turn = self.index == turn
 
@@ -805,16 +967,19 @@ class Player:
 
             update_again = False
 
-            self.update_move_combos(rolled, rolls)
+            self.update_move_combos(rolled, rolls, rolls_updated, reset_rolls_updated)
+
+            # print(rolls_updated)
+
             self.update_can_pieces_move(rolled, rolls, roll_index)
 
             if (
                 self.is_turn
                 and not is_piece_moving
-                and all(not x for x in self.can_pieces_move)
+                and len(self.possible_move_combos) == 0
                 and rolled
             ):
-                rolls.clear()
+                next_turn()
 
             for piece in self.pieces:
                 piece_pos, update_again_ = piece.update(
@@ -826,6 +991,7 @@ class Player:
                     tiles_with_multiple_pieces,
                     captured_pieces_info,
                     self.can_pieces_move[piece.index],
+                    update_rolls,
                 )
 
                 update_again = True if update_again_ else update_again
