@@ -38,8 +38,8 @@ ORANGE = (253, 150, 68)
 DARK_ORANGE = (239, 108, 0)
 DEEP_ORANGE = (255, 87, 34)
 LIGHT_GREY = (223, 228, 234)
-GREY = "#757575"
-BROWN = "#6D4C41"
+GREY = (117, 117, 117)
+BROWN = (109, 76, 65)
 LIGHT_BROWN = (247, 241, 227)
 DARK_GREY = (47, 53, 66)
 WHITE = (255, 255, 255)
@@ -105,6 +105,7 @@ PIECES_COORDS_OFFSET_FOR_MULTIPLE_PIECES = (
 
 is_piece_moving = False
 mouse_clicked = False
+change_to_button_cursor = False
 
 
 def rotate_2d_array_clockwise(arr):
@@ -210,11 +211,15 @@ class Button:
         return rect
 
     def update(self, selected=False):
+        global change_to_button_cursor
+
         if (
             self.rect.collidepoint(pygame.mouse.get_pos())
             and not self.pressed
             and not mouse_clicked
         ):
+            change_to_button_cursor = True
+
             if pygame.mouse.get_pressed()[0]:
                 self.pressed = True
 
@@ -231,7 +236,7 @@ class Dice:
     def __init__(self, x, y, width, height):
         self.all_dice = []
 
-        self.rect = pygame.Rect((x, y, width, height))
+        self.rect = pygame.Rect((x, y, width + 1, height + 1))
         self.rect.center = (x, y)
 
         self.dice_img_index = 0
@@ -243,7 +248,7 @@ class Dice:
         self.rolls_updated = False
         self.rolls_buttons = []
 
-        self.rolling_time = 100
+        self.rolling_time = 80
         self.rolling_time_counter = 0
         self.rolling_speed = 4
         self.rolling_speed_counter = 0
@@ -293,16 +298,24 @@ class Dice:
             self.rect,
         )
 
+        pygame.draw.rect(
+            surface, GREY if self.rolled or self.rolling else BROWN, self.rect, 4, 8
+        )
+
         self.draw_rolls_buttons(surface)
         self.draw_temp_dice_roll_adder(surface)
 
     def check_rolled(self):
+        global change_to_button_cursor
+
         if (
             self.rect.collidepoint(pygame.mouse.get_pos())
             and not self.rolled
             and not is_piece_moving
             and not self.rolling
         ):
+            change_to_button_cursor = True
+
             if pygame.mouse.get_pressed()[0]:
                 roll = random.randint(1, 6)
                 self.rolling = True
@@ -311,7 +324,8 @@ class Dice:
                 self.rolls.append(roll)
 
                 self.rolls_updated = True
-                
+        # else:
+        #     change_to_button_cursor = False
 
         # if not pygame.mouse.get_pressed()[0]:
         #     self.rolling = False
@@ -760,7 +774,7 @@ class Piece:
         self.selected = False
         self.speed = 20
         self.speed_counter = self.speed
-        self.piece_sizes = ((0.55, 0.5), (0.4, 0.35), (0.2, 0.18))
+        self.piece_sizes = ((0.58, 0.5), (0.4, 0.35), (0.2, 0.18))
         self.piece_coords_offset = (
             (0.5, 0.5),
             (0.5, 0.5),
@@ -784,14 +798,14 @@ class Piece:
             int(self.position.x + TILE_SIZE * x_offset),
             int(self.position.y + TILE_SIZE * y_offset),
             int(self.position.height * size1),
-            DARK_GREY if self.can_move else WHITE,
+            BROWN if self.can_move else WHITE,
         )
         gfxdraw.filled_circle(
             surface,
             int(self.position.x + TILE_SIZE * x_offset),
             int(self.position.y + TILE_SIZE * y_offset),
             int(self.position.height * size1),
-            DARK_GREY if self.can_move else WHITE,
+            BROWN if self.can_move else WHITE,
         )
 
         gfxdraw.aacircle(
@@ -836,7 +850,7 @@ class Piece:
     #     return not is_turn or not rolled or self.playing or 6 in rolls
 
     def click(self, is_turn):
-        global is_piece_moving, mouse_clicked
+        global is_piece_moving, mouse_clicked, change_to_button_cursor
 
         if (
             self.position.collidepoint(pygame.mouse.get_pos())
@@ -846,9 +860,13 @@ class Piece:
             and not is_piece_moving
             and not mouse_clicked
         ):
+            change_to_button_cursor = True
+
             if pygame.mouse.get_pressed()[0]:
                 self.selected = True
                 mouse_clicked = True
+        # else:
+        #     change_to_button_cursor = False
 
         if not pygame.mouse.get_pressed()[0]:
             self.clicked = False
@@ -1274,6 +1292,8 @@ while run:
 
     screen.fill(LIGHT_BROWN)
 
+    change_to_button_cursor = False
+
     update_again = board.update()
     if update_again:
         board.update()
@@ -1282,6 +1302,11 @@ while run:
     board.draw(screen)
 
     mouse_clicked = pygame.mouse.get_pressed()[0]
+
+    if change_to_button_cursor:
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+    else:
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
