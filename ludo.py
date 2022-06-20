@@ -1,4 +1,4 @@
-import pygame
+import pygame, sys
 from pygame import gfxdraw
 import random
 from itertools import combinations, permutations, chain
@@ -6,16 +6,18 @@ from itertools import combinations, permutations, chain
 # Initialize Pygame
 pygame.init()
 
+SCREEN_SIZE = [pygame.display.Info().current_w, pygame.display.Info().current_h]
+
 # Setup Clock
 clock = pygame.time.Clock()
 
 # Game Variables
 FPS = 60
-TILE_SIZE = 60
+TILE_SIZE = int(SCREEN_SIZE[1] / 22)
 
 # Screen Size
-SCREEN_WIDTH = TILE_SIZE * 22
-SCREEN_HEIGHT = SCREEN_WIDTH * 0.9
+SCREEN_HEIGHT = TILE_SIZE * 20
+SCREEN_WIDTH = SCREEN_HEIGHT * SCREEN_SIZE[0] / SCREEN_SIZE[1]
 
 # Ludo Board Start Coordinates
 BOARD_LEFT_X = int((SCREEN_WIDTH - 15 * TILE_SIZE) / 2)
@@ -40,6 +42,8 @@ LIGHT_BROWN = (247, 241, 227)
 DARK_GREY = (47, 53, 66)
 WHITE = (255, 255, 255)
 DARK_BROWN = (62, 39, 35)
+DISABLED_GREY = (235, 235, 228)
+LIME_GREEN = (185, 246, 202)
 
 # Board Base Layout:
 # 15 x 15 2D Board
@@ -82,6 +86,39 @@ PIECES_GENERAL_PATH = [
     "** ** ** ** ** ** 39 ** 35 ** ** ** ** ** **",
     "** ** ** ** ** ** 38 37 36 ** ** ** ** ** **",
 ]
+
+config = {
+    "players": {
+        "player-1": {
+            "index": 0,
+            "base_color": RED,
+            "piece_color": DARK_RED,
+            "max_pieces": 4,
+            "playing": True,
+        },
+        "player-2": {
+            "index": 1,
+            "base_color": BLUE,
+            "piece_color": DARK_BLUE,
+            "max_pieces": 4,
+            "playing": True,
+        },
+        "player-3": {
+            "index": 2,
+            "base_color": ORANGE,
+            "piece_color": DARK_ORANGE,
+            "max_pieces": 4,
+            "playing": True,
+        },
+        "player-4": {
+            "index": 3,
+            "base_color": GREEN,
+            "piece_color": DARK_GREEN,
+            "max_pieces": 4,
+            "playing": True,
+        },
+    }
+}
 
 SAFE_SQUARES = [0, 8, 13, 21, 26, 34, 39, 47]
 
@@ -143,44 +180,81 @@ def permutate_string(string):
     return list(set("".join(x) for x in permutations(string)))
 
 
-def draw_text(surface, text, coord_pos_offset, x, y, height, color=DARK_GREY):
+def draw_text(
+    surface,
+    text,
+    coord_offset_x,
+    coord_offset_y,
+    x,
+    y,
+    height,
+    color=DARK_GREY,
+    bg_color=None,
+):
     font = pygame.font.SysFont("Futura", int(height))
     text_img = font.render(f"{text}", True, color)
 
     pygame.rect
 
+    if bg_color:
+        border_rect = pygame.Rect(
+            (
+                x - text_img.get_width() * coord_offset_x - 6,
+                y - text_img.get_height() * coord_offset_y - 6,
+                text_img.get_width() + 12,
+                text_img.get_height() + 12,
+            ),
+        )
+
+        pygame.draw.rect(surface, bg_color, border_rect)
+        pygame.draw.rect(surface, DARK_BROWN, border_rect, 2)
+
     surface.blit(
         text_img,
         (
-            x - text_img.get_width() * coord_pos_offset,
-            y - text_img.get_height() / 2 + 1,
+            x - text_img.get_width() * coord_offset_x,
+            y - text_img.get_height() * coord_offset_y,
         ),
     )
 
 
 class Button:
-    def __init__(self, x, y, width, height, text):
-        self.rect = pygame.Rect((x, y, width, height))
+    def __init__(
+        self, x, y, width, height, text, coord_offset_x=0, coord_offset_y=0, menu=False
+    ):
+        self.rect = pygame.Rect(
+            (x - width * coord_offset_x, y - height * coord_offset_y, width, height)
+        )
+
         self.rect_border = pygame.Rect((x, y, width + 2, height + 2))
 
         self.rect_border.center = self.rect.center
 
+        self.disabled = False
+
         self.text = text
         self.pressed = False
         self.selected = False
+        self.menu = menu
 
-    def draw(self, surface, color=LIGHT_GREY):
-        pygame.draw.rect(surface, color, self.rect)
+    def draw(self, surface, color="#EFEBE9"):
         pygame.draw.rect(
             surface,
-            BROWN if self.selected else GREY,
+            DISABLED_GREY if self.disabled else color,
+            self.rect,
+        )
+        pygame.draw.rect(
+            surface,
+            DARK_BROWN if self.selected and not self.disabled else GREY,
             self.get_border_rect(),
             1 + self.selected,
         )
 
         font = pygame.font.SysFont("Futura", self.rect.height)
 
-        text_img = font.render(f"{self.text}", True, DARK_GREY)
+        text_img = font.render(
+            f"{self.text}", True, GREY if self.disabled else DARK_GREY
+        )
 
         surface.blit(
             text_img,
@@ -195,21 +269,24 @@ class Button:
             (
                 0,
                 0,
-                self.rect.h + 1 + self.selected * 2,
                 self.rect.w + 1 + self.selected * 2,
+                self.rect.h + 1 + self.selected * 2,
             )
         )
         rect.center = self.rect.center
 
         return rect
 
-    def update(self, selected=False):
+    def update(self, selected=False, disabled=False):
         global change_to_button_cursor
+
+        self.disabled = disabled
 
         if (
             self.rect.collidepoint(pygame.mouse.get_pos())
             and not self.pressed
             and not mouse_clicked
+            and not disabled
         ):
             change_to_button_cursor = True
 
@@ -276,6 +353,7 @@ class Dice:
             surface,
             "Dice Rolls: ",
             1,
+            0.5,
             BOARD_LEFT_X,
             BOARD_TOP_Y / 2,
             TILE_SIZE / 2,
@@ -309,7 +387,7 @@ class Dice:
             change_to_button_cursor = True
 
             if pygame.mouse.get_pressed()[0]:
-                roll = random.randint(1, 6 if len(self.rolls) < 6 else 5)
+                roll = random.randint(1, 6 if len(self.rolls) < 5 else 5)
                 self.rolling = True
 
                 self.last_roll = roll
@@ -381,7 +459,7 @@ class Board:
         self.y = y
         self.board_base_layout = board_base_layout
         self.players = players
-        self.turn = 1
+        self.turn = 0
         self.next_finish_position = 1
         self.finish_positions = {0: None, 1: None, 2: None, 3: None}
         self.turn_over = False
@@ -389,11 +467,16 @@ class Board:
         self.players_pieces_pos = []
         self.tiles_with_multiple_pieces = []
         self.captured_pieces_info = []
-        self.safe_squares_coords = [
-            val.center
-            for key, val in players[0].pieces[0].piece_path.items()
-            if key in SAFE_SQUARES
-        ]
+        self.safe_squares_coords = []
+
+        for player in self.players:
+            for piece in player.pieces:
+                for key, val in piece.piece_path.items():
+                    if key in SAFE_SQUARES:
+                        self.safe_squares_coords.append(val.center)
+                break
+            if len(self.safe_squares_coords):
+                break
 
         # Board Rectangle
         self.rect = pygame.Rect(
@@ -503,6 +586,18 @@ class Board:
         for player in self.players:
             player.draw_pieces(surface)
 
+    def draw_game_over(self, surface):
+        if self.game_over:
+            draw_text(
+                surface,
+                "GAME OVER!",
+                0.5,
+                0.5,
+                SCREEN_WIDTH / 2,
+                SCREEN_HEIGHT / 2,
+                TILE_SIZE * 2,
+            )
+
     def update_turn(self):
         if self.turn_over:
             self.turn += 1
@@ -512,12 +607,6 @@ class Board:
 
             if self.turn >= len(self.players):
                 self.turn = 0
-
-    def draw_temp(self, surface):
-        font = pygame.font.SysFont("Futura", 30)
-
-        turnImg = font.render(f"Player {self.turn+1}'s Turn", True, DARK_GREY)
-        surface.blit(turnImg, (40, 120))
 
     def check_game_over(self):
         if (
@@ -532,11 +621,31 @@ class Board:
         self.draw_board_center(surface)
         self.draw_player_areas(surface)
         self.draw_players_pieces(surface)
-        self.draw_temp(surface)
         self.dice.draw(surface)
+        self.draw_game_over(surface)
 
     def next_turn(self):
         self.turn_over = True
+
+    def reset(self, config):
+        return self.create_board(config)
+
+    @classmethod
+    def create_board(self, config):
+        players = []
+
+        for player_config in config["players"].values():
+
+            player = Player(
+                player_config["index"],
+                player_config["base_color"],
+                player_config["piece_color"],
+                player_config["max_pieces"] if player_config["playing"] else 0,
+            )
+
+            players.append(player)
+
+        return Board(BOARD_LEFT_X, BOARD_TOP_Y, BOARD_BASE_LAYOUT, players)
 
     def update(self):
         if not self.game_over:
@@ -774,7 +883,6 @@ class Player:
         self.pieces_pos = []
         self.can_promote = True
         self.is_turn = False
-        # self.total_move_combos = []
         self.total_possible_moves = []
         self.possible_move_combos = []
         self.can_pieces_move = [False for _ in range(self.max_pieces)]
@@ -783,6 +891,18 @@ class Player:
         self.finish_position = None
 
     def draw_player_area(self, surface):
+        draw_text(
+            surface,
+            f"Player {self.index + 1}",
+            0.5,
+            0.5,
+            self.rect.centerx,
+            self.rect.centery + TILE_SIZE * 3.4 * (-1 if self.index < 2 else 1),
+            TILE_SIZE * 0.7,
+            self.piece_color if self.is_turn else GREY,
+            bg_color=LIME_GREEN if self.is_turn else DISABLED_GREY,
+        )
+
         pygame.draw.rect(surface, WHITE, self.rect, 0, 15)
 
         if self.playing and not self.won:
@@ -797,6 +917,7 @@ class Player:
                 surface,
                 "FINISHED!",
                 0.5,
+                0.5,
                 self.rect.centerx,
                 self.rect.centery - TILE_SIZE / 2,
                 TILE_SIZE,
@@ -805,6 +926,7 @@ class Player:
             draw_text(
                 surface,
                 finish_pos_texts[self.finish_position],
+                0.5,
                 0.5,
                 self.rect.centerx,
                 self.rect.centery + TILE_SIZE / 2,
@@ -1030,6 +1152,255 @@ class Player:
             return (self.pieces_pos, False)
 
 
+class Player_Config:
+    def __init__(self, x, y, player_index, coord_offset_x, coord_offset_y):
+        self.rect = pygame.Rect((x, y, TILE_SIZE * 6, TILE_SIZE * 5))
+
+        self.rect.center = (
+            self.rect.centerx - self.rect.w * coord_offset_x,
+            self.rect.centery - self.rect.h * coord_offset_y,
+        )
+
+        player_config = config["players"][f"player-{player_index+1}"]
+
+        self.player_playing = player_config["playing"]
+        self.buttons = []
+        self.selected_btn_index = player_config["max_pieces"] - 1
+        self.player_index = player_index
+        self.select_button = Button(
+            self.rect.centerx + TILE_SIZE * 0.4,
+            self.rect.y + TILE_SIZE * 1.9,
+            TILE_SIZE * 0.5,
+            TILE_SIZE * 0.5,
+            "",
+        )
+
+        self.total_players_playing = 4
+
+        self.select_img = pygame.image.load("images/tick.png").convert_alpha()
+        self.select_img = pygame.transform.scale(
+            self.select_img, (TILE_SIZE / 2, TILE_SIZE / 2)
+        )
+
+        self.make_buttons()
+
+    def make_buttons(self):
+        for i in range(4):
+            btn = Button(
+                self.rect.centerx + TILE_SIZE * (i * 0.7 - 1.35),
+                self.rect.y + TILE_SIZE * 3.2,
+                TILE_SIZE * 0.5,
+                TILE_SIZE * 0.5,
+                i + 1,
+            )
+            self.buttons.append(btn)
+
+    def draw(self, surface):
+        pygame.draw.rect(surface, (255, 204, 188), self.rect)
+        pygame.draw.rect(surface, DARK_BROWN, self.rect, 3)
+
+        draw_text(
+            surface,
+            f"Player {self.player_index + 1}",
+            0.5,
+            0,
+            self.rect.centerx,
+            self.rect.y + TILE_SIZE / 2,
+            TILE_SIZE,
+        )
+
+        draw_text(
+            surface,
+            f"Select: ",
+            0.5,
+            0,
+            self.rect.centerx - TILE_SIZE * 0.7,
+            self.rect.y + TILE_SIZE * 2,
+            TILE_SIZE / 2,
+        )
+        draw_text(
+            surface,
+            f"No. of Pieces: ",
+            0.5,
+            0,
+            self.rect.centerx - TILE_SIZE * 0.2,
+            self.rect.y + TILE_SIZE * 2.7,
+            TILE_SIZE / 2,
+        )
+
+        for btn in self.buttons:
+            btn.draw(surface)
+
+        self.select_button.draw(surface)
+
+        if self.player_playing:
+            surface.blit(self.select_img, self.select_button.rect)
+
+    def update(self):
+        global config
+
+        self.total_players_playing = len(
+            [True for x in config["players"].values() if x["playing"]]
+        )
+
+        for i, btn in enumerate(self.buttons):
+            btn_selected = i == self.selected_btn_index
+            btn.update(btn_selected)
+
+            if btn.get_pressed():
+                self.selected_btn_index = i
+
+        self.select_button.update(
+            selected=self.player_playing,
+            disabled=self.total_players_playing < 3 and self.player_playing,
+        )
+
+        if self.select_button.get_pressed() and not mouse_clicked:
+            self.player_playing = not self.player_playing
+
+        config["players"][f"player-{self.player_index+1}"]["max_pieces"] = (
+            self.selected_btn_index + 1
+        )
+        config["players"][f"player-{self.player_index+1}"][
+            "playing"
+        ] = self.player_playing
+
+
+def options_menu(surface):
+    global change_to_button_cursor, mouse_clicked
+
+    back_button = Button(
+        SCREEN_WIDTH / 2, TILE_SIZE * 16, TILE_SIZE * 3, TILE_SIZE * 1.3, "Back", 0.5
+    )
+
+    players_config = []
+
+    for i, val in enumerate([(1, 1), (0, 1), (0, 0), (1, 0)]):
+        player_config = Player_Config(
+            SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - TILE_SIZE, i, *val
+        )
+
+        players_config.append(player_config)
+
+    run = True
+
+    while run:
+        clock.tick(FPS)
+
+        surface.fill(LIGHT_BROWN)
+
+        change_to_button_cursor = False
+
+        draw_text(
+            surface, "Options", 0.5, 0.5, SCREEN_WIDTH / 2, TILE_SIZE, TILE_SIZE * 1.3
+        )
+
+        for player_config in players_config:
+            player_config.update()
+            player_config.draw(surface)
+
+        back_button.draw(surface)
+        back_button.update(selected=True)
+
+        if back_button.get_pressed():
+            run = False
+
+        mouse_clicked = pygame.mouse.get_pressed()[0]
+
+        if change_to_button_cursor:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+        else:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        # Update Pygame Display
+        pygame.display.update()
+
+
+def main_menu(surface, resume):
+    global change_to_button_cursor, mouse_clicked
+
+    resume_btn = Button(
+        SCREEN_WIDTH / 2, TILE_SIZE * 5, TILE_SIZE * 4.5, TILE_SIZE * 1.3, "Resume", 0.5
+    )
+
+    play_btn = Button(
+        SCREEN_WIDTH / 2, TILE_SIZE * 7.5, TILE_SIZE * 3, TILE_SIZE * 1.3, "Play", 0.5
+    )
+
+    options_btn = Button(
+        SCREEN_WIDTH / 2,
+        TILE_SIZE * 10,
+        TILE_SIZE * 4.5,
+        TILE_SIZE * 1.3,
+        "Options",
+        0.5,
+    )
+
+    exit_btn = Button(
+        SCREEN_WIDTH / 2, TILE_SIZE * 12.5, TILE_SIZE * 3, TILE_SIZE * 1.3, "Exit", 0.5
+    )
+
+    menu_buttons = [play_btn, options_btn, exit_btn]
+
+    reset_board = False
+
+    run = True
+    while run:
+        clock.tick(FPS)
+
+        surface.fill(LIGHT_BROWN)
+
+        change_to_button_cursor = False
+
+        draw_text(
+            surface, "Main Menu", 0.5, 0.5, SCREEN_WIDTH / 2, TILE_SIZE, TILE_SIZE * 1.3
+        )
+
+        for btn in menu_buttons:
+            btn.draw(surface)
+            btn.update(selected=True)
+
+        resume_btn.draw(surface)
+        resume_btn.update(selected=True, disabled=not resume)
+
+        if resume_btn.get_pressed() and resume:
+            reset_board = False
+            run = False
+
+        if play_btn.get_pressed():
+            reset_board = True
+            run = False
+
+        if options_btn.get_pressed() and not mouse_clicked:
+            options_menu(surface)
+
+        if exit_btn.get_pressed():
+            pygame.quit()
+            sys.exit()
+
+        mouse_clicked = pygame.mouse.get_pressed()[0]
+
+        if change_to_button_cursor:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+        else:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        # Update Pygame Display
+        pygame.display.update()
+
+    return reset_board
+
+
 def play_ludo():
     global change_to_button_cursor, mouse_clicked
 
@@ -1037,23 +1408,39 @@ def play_ludo():
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Ludo")
 
-    player1 = Player(0, RED, DARK_RED, 2)
-    player2 = Player(1, BLUE, DARK_BLUE, 1)
-    player3 = Player(2, ORANGE, DARK_ORANGE, 0)
-    player4 = Player(3, GREEN, DARK_GREEN, 0)
+    menu_button = Button(
+        SCREEN_WIDTH / 2,
+        BOARD_TOP_Y / 2,
+        TILE_SIZE * 4,
+        TILE_SIZE,
+        "Main Menu",
+        0.5,
+        0.5,
+    )
 
-    players = (player1, player2, player3, player4)
+    board = None
 
-    board = Board(BOARD_LEFT_X, BOARD_TOP_Y, BOARD_BASE_LAYOUT, players)
+    open_main_menu = True
 
     run = True
 
     while run:
         clock.tick(FPS)
 
+        if open_main_menu:
+            reset = main_menu(screen, board != None)
+            open_main_menu = False
+
+            if reset:
+                board = Board.create_board(config)
+
         screen.fill(LIGHT_BROWN)
 
-        change_to_button_cursor = False
+        menu_button.update(selected=True)
+        menu_button.draw(screen)
+
+        if menu_button.get_pressed() and not mouse_clicked:
+            open_main_menu = True
 
         update_again = board.update()
         if update_again:
@@ -1070,6 +1457,8 @@ def play_ludo():
         else:
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
+        change_to_button_cursor = False
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
@@ -1078,6 +1467,7 @@ def play_ludo():
         pygame.display.update()
 
     pygame.quit()
+    sys.exit()
 
 
 play_ludo()
