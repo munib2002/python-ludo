@@ -13,15 +13,17 @@ clock = pygame.time.Clock()
 
 # Game Variables
 FPS = 60
-TILE_SIZE = int(SCREEN_SIZE[1] / 22)
+TILE_SIZE = round(SCREEN_SIZE[1] / 22)
 
 # Screen Size
 SCREEN_HEIGHT = TILE_SIZE * 20
-SCREEN_WIDTH = SCREEN_HEIGHT * SCREEN_SIZE[0] / SCREEN_SIZE[1]
+SCREEN_WIDTH = SCREEN_HEIGHT * (
+    SCREEN_SIZE[0] / SCREEN_SIZE[1] * (0.8 if SCREEN_SIZE[0] > SCREEN_SIZE[1] else 1)
+)
 
 # Ludo Board Start Coordinates
-BOARD_LEFT_X = int((SCREEN_WIDTH - 15 * TILE_SIZE) / 2)
-BOARD_TOP_Y = int((SCREEN_HEIGHT - 15 * TILE_SIZE) / 2)
+BOARD_LEFT_X = round((SCREEN_WIDTH - 15 * TILE_SIZE) / 2)
+BOARD_TOP_Y = round((SCREEN_HEIGHT - 15 * TILE_SIZE) / 2)
 
 
 # Colors
