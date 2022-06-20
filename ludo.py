@@ -140,11 +140,7 @@ def unique_powerset_of_string(iterable):
 
 
 def permutate_string(string):
-    # print(list(set("".join(x) for x in permutations(string))))
     return list(set("".join(x) for x in permutations(string)))
-    # return [
-    #     f"{'6'*i}{string[-1]}{'6'*(len(string) - i-1)}" for i, _ in enumerate(string)
-    # ]
 
 
 def draw_text(surface, text, coord_pos_offset, x, y, height, color=DARK_GREY):
@@ -273,7 +269,6 @@ class Dice:
             button.update(is_button_selected)
 
             if button.get_pressed():
-                print(self.roll_index)
                 self.roll_index = i
 
     def draw_rolls_buttons(self, surface):
@@ -321,57 +316,17 @@ class Dice:
                 self.rolls.append(roll)
 
                 self.rolls_updated = True
-        # else:
-        #     change_to_button_cursor = False
-
-        # if not pygame.mouse.get_pressed()[0]:
-        #     self.rolling = False
 
     def draw_temp_dice_roll_adder(self, surface):
 
         for i in range(1, 7):
             button = Button(500 + i * 50, 10, 30, 30, i)
-
-            # r = pygame.draw.rect(surface, LIGHT_GREY, (500 + i * 50, 10, 30, 30))
-            # pygame.draw.rect(surface, DARK_GREY, (500 + i * 50, 10, 32, 32), 1)
-
-            # font = pygame.font.SysFont("Futura", 30)
-
-            # numImg = font.render(f"{i}", True, DARK_GREY)
-
-            # surface.blit(numImg, (r.x + 10, r.y + 8))
-
             button.update()
             button.draw(surface)
 
             if button.get_pressed():
                 self.rolls.append(i)
                 self.rolls_updated = True
-
-            # if r.collidepoint(pygame.mouse.get_pos()) and not self.pressed:
-            #     if pygame.mouse.get_pressed()[0]:
-            #         self.pressed = True
-            #         self.rolls.append(i)
-
-            # if not pygame.mouse.get_pressed()[0]:
-            #     self.pressed = False
-        # for i in range(1, 7):
-        #     r = pygame.draw.rect(surface, LIGHT_GREY, (500 + i * 50, 10, 30, 30))
-        #     pygame.draw.rect(surface, DARK_GREY, (500 + i * 50, 10, 32, 32), 1)
-
-        #     font = pygame.font.SysFont("Futura", 30)
-
-        #     numImg = font.render(f"{i}", True, DARK_GREY)
-
-        #     surface.blit(numImg, (r.x + 10, r.y + 8))
-
-        #     if r.collidepoint(pygame.mouse.get_pos()) and not self.pressed:
-        #         if pygame.mouse.get_pressed()[0]:
-        #             self.pressed = True
-        #             self.rolls.append(i)
-
-        #     if not pygame.mouse.get_pressed()[0]:
-        #         self.pressed = False
 
     def reset(self):
         self.rolls.clear()
@@ -392,14 +347,6 @@ class Dice:
 
     def update(self):
         self.check_rolled()
-        # self.update_rolls_buttons()
-
-        # print(
-        #     self.rolled,
-        #     self.rolling,
-        #     self.rolling_speed_counter,
-        #     self.rolls,
-        # )
 
         if self.rolling:
             if self.rolling_speed_counter >= self.rolling_speed:
@@ -435,14 +382,10 @@ class Board:
         self.board_base_layout = board_base_layout
         self.players = players
         self.turn = 1
-        # self.rolls = []
-        # self.rolls_buttons = []
-        # self.roll_index = 0
-        # self.rolled = False
+        self.next_finish_position = 1
+        self.finish_positions = {0: None, 1: None, 2: None, 3: None}
         self.turn_over = False
         self.game_over = False
-        # self.rolling = False
-        # self.last_roll = 0
         self.players_pieces_pos = []
         self.tiles_with_multiple_pieces = []
         self.captured_pieces_info = []
@@ -451,14 +394,6 @@ class Board:
             for key, val in players[0].pieces[0].piece_path.items()
             if key in SAFE_SQUARES
         ]
-
-        self.next_finish_position = 1
-
-        self.finish_positions = {0: None, 1: None, 2: None, 3: None}
-
-        # self.rolls_updated = False
-
-        # self.pressed = False  # Temp
 
         # Board Rectangle
         self.rect = pygame.Rect(
@@ -539,9 +474,6 @@ class Board:
         for player in self.players:
             x1, y1, x2, y2 = CENTER_TRIANGLE_TILES_OFFSET[player.index]
 
-            # pygame.draw.polygon(surface, player.base_color, [
-            # (self.x + TILE_SIZE * x1, self.y + TILE_SIZE * y1), (self.x + TILE_SIZE * x2, self.y + TILE_SIZE * y2), self.rect.center])
-
             gfxdraw.aatrigon(
                 surface,
                 self.x + TILE_SIZE * x1,
@@ -562,8 +494,6 @@ class Board:
                 self.rect.centery,
                 player.base_color,
             )
-            # gfxdraw.aatrigon(surface, self.x + TILE_SIZE *
-            #                  x1, self.y + TILE_SIZE * y1, self.x + TILE_SIZE * x2, self.y + TILE_SIZE * y2, self.rect.centerx, self.rect.centery, DARK_GREY)
 
     def draw_player_areas(self, surface):
         for player in self.players:
@@ -579,64 +509,15 @@ class Board:
 
             self.turn_over = False
             self.dice.reset()
-            # self.rolled = False
-            # self.roll_index = 0
-            # self.rolls = []
 
             if self.turn >= len(self.players):
                 self.turn = 0
-
-    def check_for_six(self):
-        global is_piece_moving
-
-        if self.rolled and len(self.rolls) and self.rolls[-1] == 6:
-            self.rolled = False
 
     def draw_temp(self, surface):
         font = pygame.font.SysFont("Futura", 30)
 
         turnImg = font.render(f"Player {self.turn+1}'s Turn", True, DARK_GREY)
-        # rollImg = font.render(
-        #     f"Dice Rolls: {' '.join(str(x) for x in self.rolls)}", True, DARK_GREY
-        # )
-        # lastRollImg = font.render(f"Last Roll: {self.last_roll}", True, DARK_GREY)
         surface.blit(turnImg, (40, 120))
-        # surface.blit(rollImg, (350, 50))
-        # surface.blit(lastRollImg, (40, 150))
-
-    def update_rolls_buttons(self):
-        self.rolls_buttons = []
-        for i, val in enumerate(self.rolls):
-            button = Button(
-                BOARD_LEFT_X + i * TILE_SIZE * 0.8,
-                BOARD_TOP_Y / 2 - TILE_SIZE / 4 + 1,
-                TILE_SIZE / 2,
-                TILE_SIZE / 2,
-                val,
-            )
-
-            self.rolls_buttons.append(button)
-
-            is_button_selected = self.roll_index == i
-
-            button.update(is_button_selected)
-
-            if button.get_pressed():
-                print(self.roll_index)
-                self.roll_index = i
-
-    def draw_rolls_buttons(self, surface):
-        draw_text(
-            surface,
-            "Dice Rolls: ",
-            1,
-            BOARD_LEFT_X,
-            BOARD_TOP_Y / 2,
-            TILE_SIZE / 2,
-        )
-
-        for button in self.rolls_buttons:
-            button.draw(surface)
 
     def check_game_over(self):
         if (
@@ -652,63 +533,7 @@ class Board:
         self.draw_player_areas(surface)
         self.draw_players_pieces(surface)
         self.draw_temp(surface)
-        # self.draw_temp_dice_roll_adder(surface)
-        # self.draw_rolls_buttons(surface)
         self.dice.draw(surface)
-
-    def draw_temp_dice_roll_adder(self, surface):
-
-        for i in range(1, 7):
-            button = Button(500 + i * 50, 10, 30, 30, i)
-
-            # r = pygame.draw.rect(surface, LIGHT_GREY, (500 + i * 50, 10, 30, 30))
-            # pygame.draw.rect(surface, DARK_GREY, (500 + i * 50, 10, 32, 32), 1)
-
-            # font = pygame.font.SysFont("Futura", 30)
-
-            # numImg = font.render(f"{i}", True, DARK_GREY)
-
-            # surface.blit(numImg, (r.x + 10, r.y + 8))
-
-            button.update()
-            button.draw(surface)
-
-            if button.get_pressed():
-                self.rolls.append(i)
-                self.rolls_updated = True
-
-            # if r.collidepoint(pygame.mouse.get_pos()) and not self.pressed:
-            #     if pygame.mouse.get_pressed()[0]:
-            #         self.pressed = True
-            #         self.rolls.append(i)
-
-            # if not pygame.mouse.get_pressed()[0]:
-            #     self.pressed = False
-        # for i in range(1, 7):
-        #     r = pygame.draw.rect(surface, LIGHT_GREY, (500 + i * 50, 10, 30, 30))
-        #     pygame.draw.rect(surface, DARK_GREY, (500 + i * 50, 10, 32, 32), 1)
-
-        #     font = pygame.font.SysFont("Futura", 30)
-
-        #     numImg = font.render(f"{i}", True, DARK_GREY)
-
-        #     surface.blit(numImg, (r.x + 10, r.y + 8))
-
-        #     if r.collidepoint(pygame.mouse.get_pos()) and not self.pressed:
-        #         if pygame.mouse.get_pressed()[0]:
-        #             self.pressed = True
-        #             self.rolls.append(i)
-
-        #     if not pygame.mouse.get_pressed()[0]:
-        #         self.pressed = False
-
-    # def update_rolls(self):
-    #     roll = self.rolls.pop(self.roll_index)
-    #     self.roll_index = 0
-
-    #     self.rolls_updated = True
-
-    #     return roll
 
     def next_turn(self):
         self.turn_over = True
@@ -716,29 +541,7 @@ class Board:
     def update(self):
         if not self.game_over:
             self.check_game_over()
-
-            # if (
-            #     diceRect.collidepoint(pygame.mouse.get_pos())
-            #     and not self.rolled
-            #     and not is_piece_moving
-            #     and not self.rolling
-            # ):
-            #     if pygame.mouse.get_pressed()[0]:
-            #         roll = random.randint(1, 6)
-            #         self.last_roll = roll
-            #         self.rolls.append(roll)
-
-            #         self.rolling = True
-            #         self.rolls_updated = True
-            #         if roll != 6:
-            #             self.rolled = True
-
-            # if not pygame.mouse.get_pressed()[0]:
-            #     self.rolling = False
-
             self.dice.update()
-
-            # self.check_for_six()
 
             update_again = False
 
@@ -747,16 +550,10 @@ class Board:
                 player_pieces_pos, update_again_ = player.update(
                     self.turn,
                     self.dice,
-                    # self.rolls,
-                    # self.roll_index,
-                    # self.rolled,
                     self.tiles_with_multiple_pieces,
                     self.captured_pieces_info,
                     self.next_turn,
-                    self.finish_positions
-                    # self.update_rolls,
-                    # self.rolls_updated,
-                    # self.reset_rolls_updated,
+                    self.finish_positions,
                 )
 
                 if player.won and not self.finish_positions[player.index]:
@@ -771,13 +568,9 @@ class Board:
             self.update_tiles_with_multiple_pieces()
             self.update_captured_pieces_info()
 
-            # if self.rolled and not is_piece_moving and len(self.rolls) == 0:
-            #     self.turn_over = True
-
             self.update_turn()
             self.dice.update_rolls_buttons()
 
-            # self.update_rolls_buttons()
             return update_again
 
 
@@ -867,10 +660,6 @@ class Piece:
                 self.playing = True
                 return True
 
-    # def check_legal_moves(self, is_turn, rolls, rolled):
-
-    #     return not is_turn or not rolled or self.playing or 6 in rolls
-
     def click(self, is_turn):
         global is_piece_moving, mouse_clicked, change_to_button_cursor
 
@@ -887,8 +676,6 @@ class Piece:
             if pygame.mouse.get_pressed()[0]:
                 self.selected = True
                 mouse_clicked = True
-        # else:
-        #     change_to_button_cursor = False
 
         if not pygame.mouse.get_pressed()[0]:
             self.clicked = False
@@ -922,13 +709,9 @@ class Piece:
         can_promote,
         is_turn,
         dice,
-        # rolls,
-        # roll_index,
-        # rolled,
         tiles_with_multiple_pieces,
         captured_pieces_info,
         can_piece_move,
-        # update_rolls,
     ):
         update_again_ = False
 
@@ -968,21 +751,13 @@ class Piece:
                 self.move_amount -= 1
                 self.speed_counter = 0
 
-            # if not can_promote and self.path_index > 50:
-            #     self.path_index = -1
-
-            # if self.path_index > 56:
-            #     self.path_index = 56
-
             self.position = (
                 self.piece_path[self.path_index]
                 if self.playing
                 else self.initial_position
             )
 
-        # print(can_piece_move)
         return (
-            # self.check_legal_moves(is_turn, rolls, rolled) or can_piece_move,
             self.get_piece_pos_details()[0],
             self.speed_counter == 0 or update_again_,
         )
@@ -1132,19 +907,7 @@ class Player:
                 )
             ]
 
-            # self.total_move_combos = list(
-            #     set(
-            #         z
-            #         for x in list(
-            #             list(set(permutations(x))) for x in move_combos_for_1_order
-            #         )
-            #         for z in x
-            #     )
-            # )
-
             self.total_possible_moves = unique_powerset_of_string(rolls_str)
-
-            print(self.total_possible_moves)
 
             invalid_moves = [[] for _ in range(self.max_pieces)]
             is_piece_playing = [False for _ in range(self.max_pieces)]
@@ -1158,27 +921,6 @@ class Player:
                     moves_sum = sum([int(x) for x in moves])
                     if moves_sum > move_limit:
                         invalid_moves[piece.index].append(moves)
-
-            # print(
-            #     list(
-            #         set(
-            #             z
-            #             for x in list(
-            #                 list(set(permutations(x))) for x in move_combos_for_1_order
-            #             )
-            #             for z in x
-            #             if all(
-            #                 [
-            #                     z[i] == 0
-            #                     or "".join(sorted(list(z[i]), key=int)) not in v
-            #                     and (is_piece_playing[i] or z[i][0] == "6")
-            #                     for i, v in enumerate(invalid_moves)
-            #                 ]
-            #             )
-            #         )
-            #     ),
-            #     "------------------------------",
-            # )
 
             self.possible_move_combos = list(
                 set(
@@ -1199,33 +941,13 @@ class Player:
                 )
             )
 
-            # self.possible_move_combos = [
-            #     x
-            #     for x in self.total_move_combos
-            #     if all(
-            #         [
-            #             x[i] == 0
-            #             or "".join(sorted(list(x[i]), key=int)) not in v
-            #             and (is_piece_playing[i] or x[i][0] == "6")
-            #             for i, v in enumerate(invalid_moves)
-            #         ]
-            #     )
-            # ]
-
             dice.reset_rolls_updated()
-
-            print(self.possible_move_combos, "-----------")
-        # elif is_piece_moving and self.is_turn:
-        #     self.possible_move_combos = []
-        #     self.total_possible_moves = []
-        #     self.total_move_combos = []
 
     def update_can_pieces_move(self, dice):
         if dice.rolled and self.is_turn and not is_piece_moving and len(dice.rolls):
-            # print(self.total_move_combos)
-            # print(self.possible_move_combos)
 
             roll = dice.rolls[dice.roll_index]
+
             for piece in self.pieces:
                 self.can_pieces_move[piece.index] = any(
                     int(x[piece.index][0]) == roll
@@ -1254,16 +976,10 @@ class Player:
         self,
         turn,
         dice,
-        # rolls,
-        # roll_index,
-        # rolled,
         tiles_with_multiple_pieces,
         captured_pieces_info,
         next_turn,
-        finish_positions
-        # update_rolls,
-        # rolls_updated,
-        # reset_rolls_updated,
+        finish_positions,
     ):
         self.is_turn = self.index == turn
 
@@ -1273,15 +989,11 @@ class Player:
             if len(captured_pieces_info) and captured_pieces_info[0][1] == self.index:
                 self.can_promote = True
 
-            # can_pieces_move = []
             pieces_pos = []
 
             update_again = False
 
             self.update_move_combos(dice)
-
-            # print(rolls_updated)
-
             self.update_can_pieces_move(dice)
 
             if (
@@ -1298,22 +1010,14 @@ class Player:
                     self.can_promote,
                     self.is_turn,
                     dice,
-                    # rolls,
-                    # roll_index,
-                    # rolled,
                     tiles_with_multiple_pieces,
                     captured_pieces_info,
                     self.can_pieces_move[piece.index],
-                    # update_rolls,
                 )
 
                 update_again = True if update_again_ else update_again
 
-                # can_pieces_move.append(can_piece_move)
                 pieces_pos.append(piece_pos)
-
-            # if all(not x for x in can_pieces_move):
-            #     rolls.clear()
 
             return (pieces_pos, update_again)
         else:
