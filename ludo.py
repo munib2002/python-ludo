@@ -17,10 +17,6 @@ TILE_SIZE = 60
 SCREEN_WIDTH = TILE_SIZE * 22
 SCREEN_HEIGHT = SCREEN_WIDTH * 0.9
 
-# Setup Game Window
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Ludo")
-
 # Ludo Board Start Coordinates
 BOARD_LEFT_X = int((SCREEN_WIDTH - 15 * TILE_SIZE) / 2)
 BOARD_TOP_Y = int((SCREEN_HEIGHT - 15 * TILE_SIZE) / 2)
@@ -43,6 +39,7 @@ BROWN = (109, 76, 65)
 LIGHT_BROWN = (247, 241, 227)
 DARK_GREY = (47, 53, 66)
 WHITE = (255, 255, 255)
+DARK_BROWN = (62, 39, 35)
 
 # Board Base Layout:
 # 15 x 15 2D Board
@@ -317,7 +314,7 @@ class Dice:
             change_to_button_cursor = True
 
             if pygame.mouse.get_pressed()[0]:
-                roll = random.randint(1, 6)
+                roll = random.randint(1, 6 if len(self.rolls) < 6 else 5)
                 self.rolling = True
 
                 self.last_roll = roll
@@ -397,12 +394,12 @@ class Dice:
         self.check_rolled()
         # self.update_rolls_buttons()
 
-        print(
-            self.rolled,
-            self.rolling,
-            self.rolling_speed_counter,
-            self.rolls,
-        )
+        # print(
+        #     self.rolled,
+        #     self.rolling,
+        #     self.rolling_speed_counter,
+        #     self.rolls,
+        # )
 
         if self.rolling:
             if self.rolling_speed_counter >= self.rolling_speed:
@@ -422,6 +419,9 @@ class Dice:
         ):
             if self.last_roll != 6:
                 self.rolled = True
+                if len(self.rolls) == 4:
+                    self.rolls = self.rolls[-1:]
+
             self.rolling = False
             self.dice_img_index = self.last_roll - 1
             self.rolling_speed_counter = 0
@@ -440,6 +440,7 @@ class Board:
         # self.roll_index = 0
         # self.rolled = False
         self.turn_over = False
+        self.game_over = False
         # self.rolling = False
         # self.last_roll = 0
         self.players_pieces_pos = []
@@ -451,9 +452,13 @@ class Board:
             if key in SAFE_SQUARES
         ]
 
+        self.next_finish_position = 1
+
+        self.finish_positions = {0: None, 1: None, 2: None, 3: None}
+
         # self.rolls_updated = False
 
-        self.pressed = False  # Temp
+        # self.pressed = False  # Temp
 
         # Board Rectangle
         self.rect = pygame.Rect(
@@ -633,6 +638,13 @@ class Board:
         for button in self.rolls_buttons:
             button.draw(surface)
 
+    def check_game_over(self):
+        if (
+            len([True for player in self.players if player.playing])
+            <= self.next_finish_position
+        ):
+            self.game_over = True
+
     def draw(self, surface):
         self.draw_base_board(surface)
         self.draw_board_grid(surface)
@@ -702,61 +714,71 @@ class Board:
         self.turn_over = True
 
     def update(self):
-        # if (
-        #     diceRect.collidepoint(pygame.mouse.get_pos())
-        #     and not self.rolled
-        #     and not is_piece_moving
-        #     and not self.rolling
-        # ):
-        #     if pygame.mouse.get_pressed()[0]:
-        #         roll = random.randint(1, 6)
-        #         self.last_roll = roll
-        #         self.rolls.append(roll)
+        if not self.game_over:
+            self.check_game_over()
 
-        #         self.rolling = True
-        #         self.rolls_updated = True
-        #         if roll != 6:
-        #             self.rolled = True
+            # if (
+            #     diceRect.collidepoint(pygame.mouse.get_pos())
+            #     and not self.rolled
+            #     and not is_piece_moving
+            #     and not self.rolling
+            # ):
+            #     if pygame.mouse.get_pressed()[0]:
+            #         roll = random.randint(1, 6)
+            #         self.last_roll = roll
+            #         self.rolls.append(roll)
 
-        # if not pygame.mouse.get_pressed()[0]:
-        #     self.rolling = False
+            #         self.rolling = True
+            #         self.rolls_updated = True
+            #         if roll != 6:
+            #             self.rolled = True
 
-        self.dice.update()
+            # if not pygame.mouse.get_pressed()[0]:
+            #     self.rolling = False
 
-        # self.check_for_six()
+            self.dice.update()
 
-        update_again = False
+            # self.check_for_six()
 
-        self.players_pieces_pos.clear()
-        for player in self.players:
-            player_pieces_pos, update_again_ = player.update(
-                self.turn,
-                self.dice,
-                # self.rolls,
-                # self.roll_index,
-                # self.rolled,
-                self.tiles_with_multiple_pieces,
-                self.captured_pieces_info,
-                self.next_turn,
-                # self.update_rolls,
-                # self.rolls_updated,
-                # self.reset_rolls_updated,
-            )
+            update_again = False
 
-            update_again = True if update_again_ else update_again
+            self.players_pieces_pos.clear()
+            for player in self.players:
+                player_pieces_pos, update_again_ = player.update(
+                    self.turn,
+                    self.dice,
+                    # self.rolls,
+                    # self.roll_index,
+                    # self.rolled,
+                    self.tiles_with_multiple_pieces,
+                    self.captured_pieces_info,
+                    self.next_turn,
+                    self.finish_positions
+                    # self.update_rolls,
+                    # self.rolls_updated,
+                    # self.reset_rolls_updated,
+                )
 
-            self.players_pieces_pos.append(player_pieces_pos)
+                if player.won and not self.finish_positions[player.index]:
+                    self.finish_positions[player.index] = self.next_finish_position
 
-        self.update_tiles_with_multiple_pieces()
-        self.update_captured_pieces_info()
+                    self.next_finish_position += 1
 
-        # if self.rolled and not is_piece_moving and len(self.rolls) == 0:
-        #     self.turn_over = True
+                update_again = True if update_again_ else update_again
 
-        self.update_turn()
-        self.dice.update_rolls_buttons()
-        # self.update_rolls_buttons()
-        return update_again
+                self.players_pieces_pos.append(player_pieces_pos)
+
+            self.update_tiles_with_multiple_pieces()
+            self.update_captured_pieces_info()
+
+            # if self.rolled and not is_piece_moving and len(self.rolls) == 0:
+            #     self.turn_over = True
+
+            self.update_turn()
+            self.dice.update_rolls_buttons()
+
+            # self.update_rolls_buttons()
+            return update_again
 
 
 class Piece:
@@ -772,7 +794,7 @@ class Piece:
         self.piece_path = piece_path
         self.move_amount = 0
         self.selected = False
-        self.speed = 20
+        self.speed = 15
         self.speed_counter = self.speed
         self.piece_sizes = ((0.58, 0.5), (0.4, 0.35), (0.2, 0.18))
         self.piece_coords_offset = (
@@ -798,14 +820,14 @@ class Piece:
             int(self.position.x + TILE_SIZE * x_offset),
             int(self.position.y + TILE_SIZE * y_offset),
             int(self.position.height * size1),
-            BROWN if self.can_move else WHITE,
+            DARK_BROWN if self.can_move else WHITE,
         )
         gfxdraw.filled_circle(
             surface,
             int(self.position.x + TILE_SIZE * x_offset),
             int(self.position.y + TILE_SIZE * y_offset),
             int(self.position.height * size1),
-            BROWN if self.can_move else WHITE,
+            DARK_BROWN if self.can_move else WHITE,
         )
 
         gfxdraw.aacircle(
@@ -982,9 +1004,37 @@ class Player:
         self.possible_move_combos = []
         self.can_pieces_move = [False for _ in range(self.max_pieces)]
         self.won = False
+        self.playing = len(self.pieces) > 0
+        self.finish_position = None
 
     def draw_player_area(self, surface):
         pygame.draw.rect(surface, WHITE, self.rect, 0, 15)
+
+        if self.playing and not self.won:
+            pygame.draw.rect(
+                surface, DARK_BROWN if self.is_turn else WHITE, self.rect, 5, 15
+            )
+
+        if self.won and self.finish_position:
+            finish_pos_texts = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th"}
+
+            draw_text(
+                surface,
+                "FINISHED!",
+                0.5,
+                self.rect.centerx,
+                self.rect.centery - TILE_SIZE / 2,
+                TILE_SIZE,
+            )
+
+            draw_text(
+                surface,
+                finish_pos_texts[self.finish_position],
+                0.5,
+                self.rect.centerx,
+                self.rect.centery + TILE_SIZE / 2,
+                TILE_SIZE,
+            )
 
     def get_pieces_initial_positions(self):
         # Tiles Offset of Pieces from the start of the Player Area
@@ -1210,13 +1260,14 @@ class Player:
         tiles_with_multiple_pieces,
         captured_pieces_info,
         next_turn,
+        finish_positions
         # update_rolls,
         # rolls_updated,
         # reset_rolls_updated,
     ):
         self.is_turn = self.index == turn
 
-        if not self.won:
+        if not self.won and self.playing:
             self.check_win()
 
             if len(captured_pieces_info) and captured_pieces_info[0][1] == self.index:
@@ -1261,9 +1312,6 @@ class Player:
                 # can_pieces_move.append(can_piece_move)
                 pieces_pos.append(piece_pos)
 
-            if self.won:
-                self.pieces_pos = pieces_pos
-
             # if all(not x for x in can_pieces_move):
             #     rolls.clear()
 
@@ -1272,47 +1320,60 @@ class Player:
             if self.is_turn:
                 next_turn()
 
+            if self.won:
+                self.finish_position = finish_positions[self.index]
+
             return (self.pieces_pos, False)
 
 
-player1 = Player(0, RED, DARK_RED, 2)
-player2 = Player(1, BLUE, DARK_BLUE, 4)
-player3 = Player(2, ORANGE, DARK_ORANGE, 3)
-player4 = Player(3, GREEN, DARK_GREEN, 1)
+def play_ludo():
+    global change_to_button_cursor, mouse_clicked
 
-players = (player1, player2, player3, player4)
+    # Setup Game Window
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption("Ludo")
 
-board = Board(BOARD_LEFT_X, BOARD_TOP_Y, BOARD_BASE_LAYOUT, players)
+    player1 = Player(0, RED, DARK_RED, 2)
+    player2 = Player(1, BLUE, DARK_BLUE, 1)
+    player3 = Player(2, ORANGE, DARK_ORANGE, 0)
+    player4 = Player(3, GREEN, DARK_GREEN, 0)
+
+    players = (player1, player2, player3, player4)
+
+    board = Board(BOARD_LEFT_X, BOARD_TOP_Y, BOARD_BASE_LAYOUT, players)
+
+    run = True
+
+    while run:
+        clock.tick(FPS)
+
+        screen.fill(LIGHT_BROWN)
+
+        change_to_button_cursor = False
+
+        update_again = board.update()
+        if update_again:
+            board.update()
+            board.update()
+            board.update()
+
+        board.draw(screen)
+
+        mouse_clicked = pygame.mouse.get_pressed()[0]
+
+        if change_to_button_cursor:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+        else:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+
+        # Update Pygame Display
+        pygame.display.update()
+
+    pygame.quit()
 
 
-run = True
-
-while run:
-    clock.tick(FPS)
-
-    screen.fill(LIGHT_BROWN)
-
-    change_to_button_cursor = False
-
-    update_again = board.update()
-    if update_again:
-        board.update()
-        board.update()
-        board.update()
-    board.draw(screen)
-
-    mouse_clicked = pygame.mouse.get_pressed()[0]
-
-    if change_to_button_cursor:
-        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
-    else:
-        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            run = False
-
-    # Update Pygame Display
-    pygame.display.update()
-
-pygame.quit()
+play_ludo()
