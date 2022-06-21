@@ -19,6 +19,8 @@ def play_ludo():
     # Setup Game Window
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Ludo")
+    icon = pygame.image.load("images/ludo.png").convert_alpha()
+    pygame.display.set_icon(icon)
 
     menu_button = Button(
         SCREEN_WIDTH / 2,
