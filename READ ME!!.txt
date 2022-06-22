@@ -1,0 +1,8 @@
+The root file is main.py, all other files are imported in it.
+
+To Run the game,
+
+either run "python main.py" in the console (in this directory)
+Note: You might need to install pygame (by running pip install pygame) incase its not installed
+
+or run the Executable file (ludo.exe). The latest code is compiled in the Executable file.
