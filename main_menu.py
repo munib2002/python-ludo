@@ -54,6 +54,16 @@ def main_menu(surface, resume):
         resume_btn.draw(surface)
         resume_btn.update(selected=True, disabled=not resume)
 
+        draw_text(
+            surface,
+            "© 2022 Munib ur Rehman Qasim",
+            0.5,
+            0.5,
+            SCREEN_WIDTH / 2,
+            SCREEN_HEIGHT - TILE_SIZE / 2,
+            TILE_SIZE * 0.4,
+        )
+
         if resume_btn.get_pressed() and resume:
             reset_board = False
             run = False
